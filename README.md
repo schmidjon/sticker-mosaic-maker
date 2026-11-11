@@ -4,6 +4,14 @@ Turn any picture into a giant collaborative sticker mosaic, similar to the [Stic
 
 It's built for a school or library makerspace with a large-format poster printer and a Roland vinyl cutter. The poster can be tiled across many prints to make a wall-sized mosaic.
 
+## Example
+
+Hokusai's *The Great Wave off Kanagawa* as a 60″ × 40½″ mosaic: 120 × 81 half-inch squares, 8 colors and 9,720 stickers, printed as 6 tiles (3 across × 2 down) on a 24″ poster printer. The dashed lines show where the poster is split into tiles.
+
+![The Great Wave off Kanagawa as an 8-color sticker mosaic, split into six poster tiles](examples/great-wave-mosaic.webp)
+
+Sample output: [color key and assembly map (PDF)](examples/great-wave-color-key.pdf). It shows the tile layout, assembly steps, and the sticker count, sheet count and vinyl length for each color.
+
 ## Getting started
 
 1. Download `mosaic-maker.html` (or clone this repo).
