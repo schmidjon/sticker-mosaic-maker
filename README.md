@@ -1,6 +1,6 @@
 # Sticker Mosaic Maker
 
-Turn any picture into a giant collaborative sticker mosaic. The app prints a poster grid where every square has a letter, and cuts matching vinyl squares where each letter is one color. Peel, match the letter, stick, and the picture appears.
+Turn any picture into a giant collaborative sticker mosaic, similar to the [StickTogether Poster](https://www.demco.com/products/learning-materials-resources/explore/sticktogether). The app prints a poster grid where every square has a letter, and cuts matching vinyl squares where each letter is one color. Peel, match the letter, stick, and the picture appears.
 
 It's built for a school or library makerspace with a large-format poster printer and a Roland vinyl cutter. The poster can be tiled across many prints to make a wall-sized mosaic.
 
