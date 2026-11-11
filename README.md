@@ -10,7 +10,7 @@ Hokusai's *The Great Wave off Kanagawa* as a 60″ × 40½″ mosaic: 120 × 81 
 
 ![The Great Wave off Kanagawa as an 8-color sticker mosaic, split into six poster tiles](examples/great-wave-mosaic.webp)
 
-Sample output: [color key and assembly map (PDF)](examples/great-wave-color-key.pdf). It shows the tile layout, assembly steps, and the sticker count, sheet count and vinyl length for each color.
+Sample output: [color key and assembly map (PDF)](examples/great-wave-color-key.pdf). It shows the tile layout and assembly steps, a color key with the sticker count, sheet count and vinyl length for each color, and a vinyl shopping list with the closest ORACAL 651 color and roll size to order.
 
 ## Getting started
 
