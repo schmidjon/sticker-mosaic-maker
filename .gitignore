@@ -1,0 +1,14 @@
+# Build output
+dist/
+build/
+out/
+node_modules/
+
+# Local config and secrets (keep keys, tokens and passwords here, never in tracked files)
+config.local.*
+.env
+.env.*
+
+# Local tooling and OS files
+.claude/
+.DS_Store

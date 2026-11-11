@@ -1,0 +1,1203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sticker Mosaic Maker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --bg:#f4f5f7; --panel:#ffffff; --text:#1d2330; --muted:#5d6678; --border:#dde1e8;
+  --accent:#2f6fde; --accent-text:#ffffff; --soft:#eef3fd; --warn:#b5530b; --canvas:#e9ebef;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14171d; --panel:#1c2028; --text:#e7eaf0; --muted:#9aa3b5; --border:#313744;
+    --accent:#6c9cf0; --accent-text:#0d1320; --soft:#222a39; --warn:#f0a35e; --canvas:#0f1115;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14171d; --panel:#1c2028; --text:#e7eaf0; --muted:#9aa3b5; --border:#313744;
+  --accent:#6c9cf0; --accent-text:#0d1320; --soft:#222a39; --warn:#f0a35e; --canvas:#0f1115;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:14px 20px;border-bottom:1px solid var(--border);background:var(--panel);display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+header h1{font-size:18px;margin:0}
+header p{margin:0;color:var(--muted)}
+.layout{display:grid;grid-template-columns:400px 1fr;gap:16px;padding:16px;align-items:start}
+@media (max-width:900px){.layout{grid-template-columns:1fr;padding:12px 16px}}
+.controls{display:flex;flex-direction:column;gap:12px;min-width:0}
+section.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px}
+section.card h2{font-size:14px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.step{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--accent-text);font-size:12px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+input[type=number],input[type=text],select,textarea{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 8px;min-width:0;width:100%}
+textarea{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+input[type=color]{width:34px;height:30px;padding:0;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer}
+button{font:inherit;border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:6px;padding:6px 11px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-text);font-weight:600}
+button:disabled{opacity:.5;cursor:not-allowed}
+.muted{color:var(--muted);font-size:12px}
+.warn{color:var(--warn);font-size:12px}
+.drop{border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;color:var(--muted)}
+.drop.over{border-color:var(--accent);background:var(--soft)}
+.drop img{max-width:100%;max-height:140px;border-radius:6px;display:block;margin:0 auto 8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12px;padding:4px 8px;border-radius:999px}
+.chip.on{background:var(--soft);border-color:var(--accent)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:7px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:5px 10px}
+.seg button.on{background:var(--accent);color:var(--accent-text)}
+.pal{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.pal-row{display:grid;grid-template-columns:30px 36px 1fr auto 28px;gap:6px;align-items:center;padding:6px;border:1px solid var(--border);border-radius:8px}
+.pal-row .code{font-weight:700;text-align:center}
+.pal-row .count{font-size:12px;color:var(--muted);white-space:nowrap;text-align:right}
+.pal-row .sub{grid-column:2 / -1;display:flex;gap:8px;align-items:center}
+.pal-row .sub select{flex:1;padding:4px 6px;font-size:12px}
+.pal-row .sub label{font-size:12px;color:var(--muted);white-space:nowrap;display:flex;gap:4px;align-items:center}
+.pal-row .del{padding:2px 0;width:28px}
+.pal-row.paper{background:repeating-linear-gradient(45deg,transparent 0 6px,var(--soft) 6px 12px)}
+details{margin-top:10px}
+summary{cursor:pointer;font-weight:600;font-size:13px}
+.lib{max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:4px;margin:8px 0}
+.lib-row{display:grid;grid-template-columns:20px 30px 1fr 26px;gap:6px;align-items:center}
+.lib-row input[type=color]{width:30px;height:24px}
+.lib-row input[type=text]{padding:3px 6px;font-size:12px}
+.lib-row button{padding:0;height:24px}
+.workspace{position:sticky;top:12px;display:flex;flex-direction:column;gap:12px;min-width:0}
+@media (max-width:900px){.workspace{position:static}}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.stat{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.stat .v{font-size:20px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+.stat .s{font-size:12px;color:var(--muted)}
+.stat.big{background:var(--soft);border-color:var(--accent)}
+.viewbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
+.viewbar input[type=range]{width:120px}
+.viewport{background:var(--canvas);border:1px solid var(--border);border-radius:10px;overflow:auto;height:calc(100vh - 290px);min-height:360px;padding:12px;position:relative}
+.viewport canvas{display:block;image-rendering:pixelated;box-shadow:0 1px 6px rgba(0,0,0,.25)}
+.empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;padding:20px}
+.busy{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;place-items:center;z-index:10}
+.busy div{background:var(--panel);padding:16px 22px;border-radius:10px;font-weight:600}
+.tune{display:flex;flex-direction:column;gap:8px;margin:8px 0;padding:10px;border:1px solid var(--border);border-radius:8px}
+.tune input[type=range]{width:100%}
+.scale{display:flex;justify-content:space-between;font-size:11px}
+.shop{display:flex;flex-direction:column;gap:8px}
+.shop-row{display:grid;grid-template-columns:24px 44px 1fr;gap:8px;align-items:start;padding:8px;border:1px solid var(--border);border-radius:8px}
+.shop-row .code{font-weight:700;text-align:center;padding-top:4px}
+.sw2{display:flex;flex-direction:column;gap:2px}
+.sw2 i{display:block;width:44px;height:16px;border-radius:4px;border:1px solid var(--border)}
+.shop-row b{font-size:13px}
+.shop-row .need{font-size:12px;color:var(--muted);margin-top:2px}
+.shop-row .links{font-size:12px;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
+.shop-row .links button{font-size:12px;padding:2px 8px}
+a{color:var(--accent)}
+.match{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;margin-left:4px;font-weight:600;white-space:nowrap}
+.match.m0{background:#d9f2df;color:#185c2c}.match.m1{background:#e6f0d5;color:#3d5a14}.match.m2{background:#fbecc9;color:#7a4b00}.match.m3{background:#fadbd6;color:#8a1f12}
+.tips{margin-top:10px;font-size:12px;padding:10px;border-radius:8px;background:var(--soft)}
+.tips ul{margin:6px 0 0;padding-left:18px}
+.tips li{margin:3px 0}
+.timebox{margin-top:8px;padding:10px;border-radius:8px;background:var(--soft);font-size:13px}
+.timebox b{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<header>
+  <h1>Sticker Mosaic Maker</h1>
+  <p>Turn a picture into a letter-coded poster grid and matching vinyl sticker cut files.</p>
+</header>
+
+<main class="layout">
+<aside class="controls">
+
+  <section class="card">
+    <h2><span class="step">1</span>Picture</h2>
+    <div class="drop" id="drop">
+      <div id="dropInner">Drop an image here or click to choose<br><span class="muted">JPG, PNG, WebP. You can also paste an image.</span></div>
+    </div>
+    <input type="file" id="file" accept="image/*" hidden>
+    <div class="row">
+      <button id="sampleBtn">Use a sample picture</button>
+    </div>
+    <label class="f">Mosaic title (used on the posters and file names)
+      <input type="text" id="title" value="Our Mosaic">
+    </label>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">2</span>Finished size</h2>
+    <div class="grid2">
+      <label class="f">Width (inches)<input type="number" id="wIn" min="2" step="1" value="40"></label>
+      <label class="f">Height (inches)<input type="number" id="hIn" min="2" step="1" value="36"></label>
+    </div>
+    <div class="row">
+      <label class="muted"><input type="checkbox" id="lockAspect" checked> Keep the picture's shape (unchecked: crop to fit)</label>
+    </div>
+    <label class="f">Square size (inches). Sticker kits use ½″.
+      <input type="number" id="sq" min="0.125" step="0.125" value="0.5">
+    </label>
+    <div class="muted" style="margin:8px 0 4px">Sticker count at other square sizes:</div>
+    <div class="chips" id="sizeChips"></div>
+    <p class="muted" id="gridInfo"></p>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">3</span>Colors</h2>
+    <div class="row">
+      <span class="muted">Pick colors</span>
+      <div class="seg" id="srcSeg">
+        <button data-v="image" class="on">From the picture</button>
+        <button data-v="stock">From my vinyl stock</button>
+      </div>
+    </div>
+    <div class="row">
+      <label class="f" style="flex:1">Number of colors: <b id="nOut">8</b>
+        <input type="range" id="nColors" min="2" max="30" value="8">
+      </label>
+      <button class="primary" id="genBtn">Generate</button>
+    </div>
+    <div class="tune">
+      <label class="f">Color priority: <span><b id="focusOut"></b></span>
+        <input type="range" id="focus" min="0" max="100" value="50">
+        <span class="scale"><span>Big areas</span><span>Small details</span></span>
+      </label>
+      <label class="f">Sharpen details: <b id="sharpOut"></b>
+        <input type="range" id="sharp" min="0" max="150" value="60">
+      </label>
+      <div class="grid2">
+        <label class="f">Contrast: <b id="contrastOut"></b><input type="range" id="contrast" min="-50" max="60" value="0"></label>
+        <label class="f">Saturation: <b id="saturOut"></b><input type="range" id="satur" min="-60" max="80" value="0"></label>
+      </div>
+      <label class="f">Blend gradients (dithering): <b id="ditherOut"></b>
+        <input type="range" id="dither" min="0" max="100" value="0">
+      </label>
+      <label class="muted"><input type="checkbox" id="despeckle"> Clean up stray single squares</label>
+      <p class="muted" style="margin:6px 0 0">Changing these re-picks the colors unless you have edited the color list by hand. Compare results with the “Side by side” view and the Likeness score.</p>
+    </div>
+    <div class="row">
+      <button id="snapBtn" title="Replace each color with the closest unused color from your vinyl stock">Match all to my vinyl stock</button>
+      <button id="addBtn">＋ Add color</button>
+    </div>
+    <p class="muted">Edit a color with its swatch, or pick a vinyl color from its menu. Check “No sticker” for a color you want to leave as bare poster paper (usually white).</p>
+    <div class="pal" id="palette"></div>
+
+    <details id="libDetails">
+      <summary>My vinyl stock (<span id="libCount">0</span> colors)</summary>
+      <p class="muted">Checked colors are used by “From my vinyl stock” and appear in each color's menu. The starting list is Oracal 651; its swatches are approximate screen colors, so set them to match your real vinyl.</p>
+      <div class="lib" id="lib"></div>
+      <div class="row">
+        <button id="libAdd">＋ Add</button>
+        <button id="libAll">Check all</button>
+        <button id="libNone">Uncheck all</button>
+        <button id="libReset">Reset to Oracal 651</button>
+      </div>
+      <details>
+        <summary>Paste or copy a list</summary>
+        <p class="muted">One color per line: <code>Name, #hex</code></p>
+        <textarea id="libText" rows="6"></textarea>
+        <div class="row"><button id="libImport">Replace stock with this list</button><button id="libExport">Show my list</button></div>
+      </details>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">4</span>Poster printing</h2>
+    <div class="grid2">
+      <label class="f">Printer paper width (in)<input type="number" id="pW" min="6" step="1" value="24"></label>
+      <label class="f">Longest tile length (in)<input type="number" id="pL" min="6" step="1" value="36"></label>
+      <label class="f">Margin around grid (in)<input type="number" id="pM" min="0.25" step="0.125" value="0.5"></label>
+      <label class="f">Letter shade
+        <select id="shade">
+          <option value="170">Light gray (hides best under light vinyl)</option>
+          <option value="110" selected>Medium gray</option>
+          <option value="0">Black</option>
+        </select>
+      </label>
+    </div>
+    <p class="muted" id="tileInfo"></p>
+    <div class="row">
+      <button class="primary" id="pdfBtn" disabled>Download poster tiles (PDF)</button>
+      <button id="guideBtn" disabled>Download color key &amp; map (PDF)</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">5</span>Vinyl cutting (Roland)</h2>
+    <div class="grid2">
+      <label class="f">Vinyl roll width (in)<input type="number" id="vW" min="2" step="1" value="12"></label>
+      <label class="f">Max sheet length (in)<input type="number" id="vL" min="2" step="1" value="24"></label>
+      <label class="f">Sticker size (in)<input type="number" id="vS" min="0.1" step="0.01" placeholder="same as square"></label>
+      <label class="f">Extra stickers (%)<input type="number" id="vSpare" min="0" step="1" value="5"></label>
+      <label class="f">Cut layout
+        <select id="vMode">
+          <option value="grid">Shared grid lines (faster cut)</option>
+          <option value="individual">Separate squares with gaps</option>
+        </select>
+      </label>
+      <label class="f">Gap between squares (in)<input type="number" id="vGap" min="0" step="0.0625" value="0.125"></label>
+      <label class="f">Edge margin (in)<input type="number" id="vM" min="0" step="0.125" value="0.25"></label>
+    </div>
+    <p class="muted" id="vinylInfo"></p>
+    <div class="row">
+      <button class="primary" id="zipBtn" disabled>Download cut files (ZIP)</button>
+    </div>
+    <p class="muted">The ZIP has one SVG and one EPS per sheet, sorted by color letter, plus a cut list. Use whichever format your Roland software (CutStudio or VersaWorks) imports.</p>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">6</span>Buy vinyl</h2>
+    <p class="muted">The closest ORACAL 651 color for each sticker color, how much to order at your roll width, and links to search stores. ORACAL 651 is a common permanent sign vinyl that cuts well on Roland cutters.</p>
+    <div id="shopList" class="shop"><p class="muted">Load a picture to see the shopping list.</p></div>
+    <div class="row">
+      <button id="shopCsvBtn" disabled>Download shopping list (CSV)</button>
+      <button id="snapOracalBtn" disabled title="Change every sticker color to its closest ORACAL 651 color">Use the recommended vinyl for all</button>
+    </div>
+    <div class="tips">
+      <b>Before you order</b>
+      <ul>
+        <li>Screen colors are approximate. Order a printed <a href="https://signwarehouse.com/products/oracal-651-vinyl-color-chart" target="_blank" rel="noopener">ORACAL 651 color chart</a> and hold it next to your picture, then fix any color in step 3.</li>
+        <li>Craft sellers usually sell 12″ × 10 ft rolls. Sign-supply distributors sell 10-yard (30 ft) and 50-yard (150 ft) rolls in 12″, 15″, 24″ and wider. Big jobs are usually cheapest in 10- or 50-yard rolls.</li>
+        <li>For a school purchase order or bulk pricing, buy through an authorized ORAFOL sign-supply distributor. <a href="https://orafol.com/en/americas/sales-team" target="_blank" rel="noopener">ORAFOL Americas' sales team</a> can point you to one near you.</li>
+        <li>Many colors also come in matte (marked below), which cuts glare on a wall under bright lights.</li>
+      </ul>
+    </div>
+    <details>
+      <summary>Stores to search</summary>
+      <p class="muted">One per line: <code>Store name | search address with {q}</code>. Add your district's vendor here.</p>
+      <textarea id="storesText" rows="5"></textarea>
+      <div class="row"><button id="storesSave">Save stores</button><button id="storesReset">Reset</button></div>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">7</span>Time estimate</h2>
+    <div class="grid2">
+      <label class="f">Seconds to place one sticker<input type="number" id="tPlace" min="1" step="1" value="8"></label>
+      <label class="f">Seconds to weed per sticker<input type="number" id="tWeed" min="0" step="0.5" value="1"></label>
+      <label class="f">Minutes per poster tile (trim &amp; mount)<input type="number" id="tTile" min="0" step="1" value="10"></label>
+      <label class="f">People sharing the work<input type="number" id="tPeople" min="1" step="1" value="25"></label>
+    </div>
+    <div class="timebox" id="timeBox">Load a picture to see the estimate.</div>
+  </section>
+
+</aside>
+
+<div class="workspace">
+  <div class="stats" id="stats"></div>
+  <div class="viewbar">
+    <div class="seg" id="viewSeg">
+      <button data-v="mosaic" class="on">Finished mosaic</button>
+      <button data-v="poster">Poster (letters)</button>
+      <button data-v="original">Original</button>
+      <button data-v="compare">Side by side</button>
+    </div>
+    <label class="muted"><input type="checkbox" id="showTiles" checked> Show poster tiles</label>
+    <label class="muted">Zoom <input type="range" id="zoom" min="1" max="40" value="8"></label>
+    <button id="fitBtn">Fit</button>
+    <button id="pngBtn" disabled>Save preview PNG</button>
+  </div>
+  <div class="viewport" id="viewport">
+    <canvas id="view" width="1" height="1"></canvas>
+    <div class="empty" id="empty">Add a picture in step 1 to start.</div>
+  </div>
+</div>
+</main>
+<div class="busy" id="busy"><div id="busyMsg">Working…</div></div>
+
+<script>
+// ---------- Constants ----------
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const code = i => i < 26 ? LETTERS[i] : LETTERS[Math.floor(i / 26) - 1] + LETTERS[i % 26];
+const LIB_KEY = 'mosaicMaker.library.v2';
+const STORES_KEY = 'mosaicMaker.stores.v1';
+// ORACAL 651 gloss colors: [number, name, hex from ORAFOL's published sRGB values, matte also made].
+// Screen colors are still approximate; check a printed color chart before ordering.
+const ORACAL = [
+  ['010','White','#e6e9ee',1], ['020','Golden Yellow','#fbaa00',0], ['019','Signal Yellow','#e6a700',0], ['021','Yellow','#fec500',0],
+  ['022','Light Yellow','#f2ca00',1], ['025','Brimstone Yellow','#f2e210',0], ['026','Purple Red','#5e050e',0], ['312','Burgundy','#6f000e',1],
+  ['030','Dark Red','#900e16',0], ['031','Red','#b0000d',1], ['032','Light Red','#c91100',0], ['034','Orange','#e1512c',1],
+  ['047','Orange Red','#d33100',0], ['036','Light Orange','#ea6700',0], ['035','Pastel Orange','#fc6c00',0], ['341','Coral','#f88873',0],
+  ['404','Purple','#412773',0], ['040','Violet','#5d2c68',1], ['043','Lavender','#775ea0',0], ['042','Lilac','#b893bc',0],
+  ['041','Pink','#c22b6b',1], ['045','Soft Pink','#ed84b6',1], ['562','Deep Sea Blue','#131e3a',0], ['518','Steel Blue','#13133e',0],
+  ['050','Dark Blue','#1b2e5d',1], ['065','Cobalt Blue','#12226c',0], ['049','King Blue','#152a78',0], ['086','Brilliant Blue','#1930ab',0],
+  ['067','Blue','#003a79',0], ['057','Traffic Blue','#00408c',0], ['051','Gentian Blue','#004684',0], ['098','Gentian','#0050a2',0],
+  ['052','Azure Blue','#005dab',0], ['084','Sky Blue','#0075bb',1], ['053','Light Blue','#0089c3',0], ['056','Ice Blue','#3da1d2',0],
+  ['066','Turquoise Blue','#00818c',0], ['054','Turquoise','#009b97',1], ['055','Mint','#5fcdb7',0], ['060','Dark Green','#004028',0],
+  ['613','Forest Green','#005236',0], ['061','Green','#00784b',1], ['068','Grass Green','#007a42',0], ['062','Light Green','#00873c',0],
+  ['064','Yellow Green','#289901',0], ['063','Lime-tree Green','#6aa72d',0], ['080','Brown','#432f1e',1], ['083','Nut Brown','#af591f',0],
+  ['824','Imitation Gold','#d2972f',0], ['081','Light Brown','#a8885c',0], ['082','Beige','#cec09f',0], ['023','Cream','#ebd494',0],
+  ['070','Black','#0d0e11',1], ['073','Dark Grey','#4b4c4c',1], ['071','Grey','#757d7c',1], ['076','Telegrey','#818689',0],
+  ['074','Middle Grey','#8a8f8b',0], ['072','Light Grey','#bfc2c0',0], ['090','Silver Grey (metallic)','#686a6d',1], ['091','Gold (metallic)','#756232',1],
+  ['092','Copper (metallic)','#6b411d',0]
+];
+
+// ---------- State ----------
+const S = {
+  img: null, crop: null, cols: 0, rows: 0,
+  cellLab: null, cellRGB: null, assign: null, counts: [],
+  palette: [], source: 'image', view: 'mosaic', zoom: 8,
+  library: loadLibrary()
+};
+
+// ---------- Helpers ----------
+const $ = s => document.querySelector(s);
+const num = (id, d) => { const v = parseFloat($(id).value); return isFinite(v) ? v : d; };
+const fmt = n => Math.round(n).toLocaleString();
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const slug = s => String(s).trim().replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'mosaic';
+const fmtIn = v => (Math.round(v * 100) / 100) + '″';
+// PDF standard fonts lack ″ and ′, so PDFs use plain quote marks.
+const pdfSafe = s => String(s).replace(/″/g, '"').replace(/′/g, "'");
+function fmtFt(inches){ const ft = Math.floor(inches / 12), i = Math.round(inches - ft * 12); return ft ? `${ft}′ ${i}″` : `${i}″`; }
+function fmtDur(hours){
+  if (hours < 1/60) return '< 1 min';
+  if (hours < 1) return Math.round(hours * 60) + ' min';
+  const h = Math.floor(hours), m = Math.round((hours - h) * 60);
+  return `${h.toLocaleString()} h${m ? ' ' + m + ' min' : ''}`;
+}
+function busy(on, msg){ $('#busy').style.display = on ? 'grid' : 'none'; if (msg) $('#busyMsg').textContent = msg; }
+const nextFrame = () => new Promise(r => setTimeout(r, 30));
+function download(blob, name){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+// ---------- Color math (sRGB <-> CIELAB) ----------
+function hexToRgb(h){ h = h.replace('#',''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); const n = parseInt(h, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function rgbToHex(r, g, b){ return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join(''); }
+const toLin = c => (c /= 255) <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+const fromLin = c => 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
+function rgbToLab(r, g, b){
+  const R = toLin(r), G = toLin(g), B = toLin(b);
+  const f = t => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+  const fx = f((0.4124 * R + 0.3576 * G + 0.1805 * B) / 0.95047);
+  const fy = f(0.2126 * R + 0.7152 * G + 0.0722 * B);
+  const fz = f((0.0193 * R + 0.1192 * G + 0.9505 * B) / 1.08883);
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+function labToHex(L, a, b){
+  const fy = (L + 16) / 116, fx = fy + a / 500, fz = fy - b / 200;
+  const inv = t => t * t * t > 0.008856 ? t * t * t : (t - 16 / 116) / 7.787;
+  const X = inv(fx) * 0.95047, Y = inv(fy), Z = inv(fz) * 1.08883;
+  return rgbToHex(fromLin(3.2406 * X - 1.5372 * Y - 0.4986 * Z), fromLin(-0.9689 * X + 1.8758 * Y + 0.0415 * Z), fromLin(0.0557 * X - 0.2040 * Y + 1.0570 * Z));
+}
+const hexLab = h => rgbToLab(...hexToRgb(h));
+const textOn = h => hexLab(h)[0] > 60 ? '#000' : '#fff';
+
+// ---------- Vinyl stock library ----------
+// Metallics start unchecked: their flat screen swatch doesn't show how they really look.
+function oracalLibrary(){ return ORACAL.map(([code, name, hex]) => ({ name: `${code} ${name}`, hex, on: !/metallic/.test(name) })); }
+function loadLibrary(){
+  try { const v = JSON.parse(localStorage.getItem(LIB_KEY)); if (Array.isArray(v) && v.length) return v; } catch (e) {}
+  return oracalLibrary();
+}
+function saveLibrary(){ try { localStorage.setItem(LIB_KEY, JSON.stringify(S.library)); } catch (e) {} }
+const stock = () => S.library.filter(c => c.on && /^#[0-9a-f]{6}$/i.test(c.hex));
+
+function renderLibrary(){
+  $('#libCount').textContent = S.library.filter(c => c.on).length;
+  const el = $('#lib'); el.innerHTML = '';
+  S.library.forEach((c, i) => {
+    const row = document.createElement('div'); row.className = 'lib-row';
+    row.innerHTML = `<input type="checkbox" ${c.on ? 'checked' : ''} title="Available"><input type="color" value="${c.hex}"><input type="text" value="${esc(c.name)}"><button title="Remove">×</button>`;
+    const [cb, col, nm, del] = row.children;
+    cb.onchange = () => { c.on = cb.checked; saveLibrary(); $('#libCount').textContent = S.library.filter(c => c.on).length; renderPalette(); };
+    col.onchange = () => { c.hex = col.value; saveLibrary(); renderPalette(); };
+    nm.onchange = () => { c.name = nm.value; saveLibrary(); renderPalette(); };
+    del.onclick = () => { S.library.splice(i, 1); saveLibrary(); renderLibrary(); renderPalette(); };
+    el.appendChild(row);
+  });
+}
+
+// ---------- Image loading & grid sampling ----------
+function loadImage(src){
+  const img = new Image();
+  img.onload = () => {
+    S.img = img;
+    $('#dropInner').innerHTML = `<img src="${src}" alt=""><span class="muted">${img.naturalWidth}×${img.naturalHeight}px · click to replace</span>`;
+    syncHeightFromWidth();
+    rebuild(true);
+  };
+  img.onerror = () => alert('That file could not be opened as an image.');
+  img.src = src;
+}
+function readFile(f){ if (!f || !f.type.startsWith('image/')) return; const r = new FileReader(); r.onload = () => loadImage(r.result); r.readAsDataURL(f); }
+
+function aspect(){ return S.img ? S.img.naturalWidth / S.img.naturalHeight : 1; }
+function syncHeightFromWidth(){ if ($('#lockAspect').checked && S.img) $('#hIn').value = Math.round(num('#wIn', 40) / aspect() * 100) / 100; }
+function syncWidthFromHeight(){ if ($('#lockAspect').checked && S.img) $('#wIn').value = Math.round(num('#hIn', 36) * aspect() * 100) / 100; }
+
+function sampleCells(){
+  const sq = Math.max(0.05, num('#sq', 0.5));
+  const cols = Math.max(1, Math.round(num('#wIn', 40) / sq));
+  const rows = Math.max(1, Math.round(num('#hIn', 36) / sq));
+  S.cols = cols; S.rows = rows;
+  const iw = S.img.naturalWidth, ih = S.img.naturalHeight, target = cols / rows;
+  let sx = 0, sy = 0, sw = iw, sh = ih;
+  if (iw / ih > target) { sw = ih * target; sx = (iw - sw) / 2; } else { sh = iw / target; sy = (ih - sh) / 2; }
+  S.crop = { sx, sy, sw, sh };
+  const k = Math.max(1, Math.min(8, Math.floor(Math.sqrt(4e6 / (cols * rows)))));
+  const c = document.createElement('canvas'); c.width = cols * k; c.height = rows * k;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(S.img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  const d = ctx.getImageData(0, 0, c.width, c.height).data;
+  const n = cols * rows, lab = new Float32Array(n * 3), kk = k * k;
+  const lin = new Float32Array(256); for (let v = 0; v < 256; v++) lin[v] = toLin(v);
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    // Average in linear light so a square looks like its area does from a distance.
+    let r = 0, g = 0, b = 0;
+    for (let j = 0; j < k; j++) { let p = ((y * k + j) * c.width + x * k) * 4; for (let i = 0; i < k; i++, p += 4) { r += lin[d[p]]; g += lin[d[p + 1]]; b += lin[d[p + 2]]; } }
+    const ci = y * cols + x;
+    const L = rgbToLab(fromLin(r / kk), fromLin(g / kk), fromLin(b / kk)); lab[ci * 3] = L[0]; lab[ci * 3 + 1] = L[1]; lab[ci * 3 + 2] = L[2];
+  }
+  S.cellLabRaw = lab;
+  applyTuning();
+}
+
+// 3x3 box blur of a 3-channel Lab grid (edges clamp).
+function blurLab(src, W, H){
+  const out = new Float32Array(src.length);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    let a = 0, b = 0, c = 0, n = 0;
+    for (let dy = -1; dy <= 1; dy++) { const yy = y + dy; if (yy < 0 || yy >= H) continue;
+      for (let dx = -1; dx <= 1; dx++) { const xx = x + dx; if (xx < 0 || xx >= W) continue; const k = (yy * W + xx) * 3; a += src[k]; b += src[k + 1]; c += src[k + 2]; n++; } }
+    const k = (y * W + x) * 3; out[k] = a / n; out[k + 1] = b / n; out[k + 2] = c / n;
+  }
+  return out;
+}
+
+// Sharpen, contrast and saturation on the square grid, plus a per-square detail map
+// used to give edges and small features more say when colors are picked.
+function applyTuning(){
+  const raw = S.cellLabRaw, W = S.cols, H = S.rows, n = W * H;
+  const sh = num('#sharp', 60) / 100, con = num('#contrast', 0) / 100, sat = num('#satur', 0) / 100;
+  const blur = blurLab(raw, W, H), out = new Float32Array(n * 3), edge = new Float32Array(n);
+  let mL = 0; for (let i = 0; i < n; i++) mL += raw[i * 3]; mL /= n;
+  for (let i = 0; i < n; i++) {
+    const k = i * 3, dL = raw[k] - blur[k], da = raw[k + 1] - blur[k + 1], db = raw[k + 2] - blur[k + 2];
+    edge[i] = Math.sqrt(dL * dL + da * da + db * db);
+    const L = raw[k] + sh * dL;
+    out[k] = Math.max(0, Math.min(100, mL + (L - mL) * (1 + con)));
+    out[k + 1] = (raw[k + 1] + sh * 0.5 * da) * (1 + sat);
+    out[k + 2] = (raw[k + 2] + sh * 0.5 * db) * (1 + sat);
+  }
+  S.cellLab = out; S.edge = edge;
+}
+
+// ---------- Palette generation ----------
+// Lightness counts extra when matching colors: tone (light vs dark) carries most of what
+// makes faces and shapes recognizable, more than exact hue.
+var LW = 2;
+function rng(seed){ return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+// Sample squares with weights. Plain sampling lets big flat areas (sky, walls) claim most
+// colors; weighting by color rarity and local detail saves colors for small features
+// such as eyes, lettering and outlines that make a picture recognizable.
+function samplePoints(max){
+  const n = S.cols * S.rows, lab = S.cellLab, edge = S.edge, focus = num('#focus', 50) / 100;
+  const key = new Int32Array(n), bins = new Map();
+  for (let i = 0; i < n; i++) {
+    const k = ((Math.floor(lab[i*3] / 4) + 2) * 96 + Math.floor(lab[i*3+1] / 6) + 48) * 96 + Math.floor(lab[i*3+2] / 6) + 48;
+    key[i] = k; bins.set(k, (bins.get(k) || 0) + 1);
+  }
+  let meanEdge = 0; for (let i = 0; i < n; i++) meanEdge += edge[i]; meanEdge = meanEdge / n || 1;
+  const step = Math.max(1, n / max), pts = [], w = [];
+  for (let t = 0; t < n; t += step) {
+    const i = Math.floor(t);
+    pts.push(lab[i*3], lab[i*3+1], lab[i*3+2]);
+    w.push(Math.pow(bins.get(key[i]), -0.85 * focus) * (1 + 1.5 * focus * Math.min(3, edge[i] / meanEdge)));
+  }
+  return { pts: new Float32Array(pts), w: new Float32Array(w) };
+}
+// Weighted k-means in Lab with k-means++ seeding; keeps the best of several restarts.
+function kmeans({ pts, w }, k){
+  const m = w.length; let bestC = null, bestErr = Infinity;
+  for (let run = 1; run <= 4; run++) {
+    const rand = rng(run * 7919), C = [], d2 = new Float64Array(m).fill(Infinity);
+    const pickWeighted = vals => { let sum = 0; for (let i = 0; i < m; i++) sum += vals(i); let r = rand() * sum, i = 0; for (; i < m - 1; i++) { r -= vals(i); if (r <= 0) break; } return i; };
+    let f = pickWeighted(i => w[i]); C.push([pts[f*3], pts[f*3+1], pts[f*3+2]]);
+    while (C.length < k) {
+      const c = C[C.length - 1];
+      for (let i = 0; i < m; i++) { const a = pts[i*3]-c[0], b = pts[i*3+1]-c[1], e = pts[i*3+2]-c[2]; const dd = LW*a*a+b*b+e*e; if (dd < d2[i]) d2[i] = dd; }
+      let any = false; for (let i = 0; i < m; i++) if (d2[i] > 0) { any = true; break; }
+      if (!any) break;
+      f = pickWeighted(i => d2[i] * w[i]); C.push([pts[f*3], pts[f*3+1], pts[f*3+2]]);
+    }
+    let err = 0;
+    for (let it = 0; it < 30; it++) {
+      const acc = C.map(() => [0, 0, 0, 0]); err = 0;
+      for (let i = 0; i < m; i++) {
+        let best = 0, bd = Infinity;
+        for (let j = 0; j < C.length; j++) { const a = pts[i*3]-C[j][0], b = pts[i*3+1]-C[j][1], e = pts[i*3+2]-C[j][2]; const dd = LW*a*a+b*b+e*e; if (dd < bd) { bd = dd; best = j; } }
+        const A = acc[best], wi = w[i]; A[0] += pts[i*3]*wi; A[1] += pts[i*3+1]*wi; A[2] += pts[i*3+2]*wi; A[3] += wi; err += bd * wi;
+      }
+      let moved = 0;
+      C.forEach((c, j) => { const A = acc[j]; if (!A[3]) return; const nc = [A[0]/A[3], A[1]/A[3], A[2]/A[3]]; moved += Math.abs(nc[0]-c[0]) + Math.abs(nc[1]-c[1]) + Math.abs(nc[2]-c[2]); C[j] = nc; });
+      if (moved < 0.01) break;
+    }
+    if (err < bestErr) { bestErr = err; bestC = C; }
+  }
+  return bestC;
+}
+// Choose N colors from the vinyl stock: greedy picks, then swap each pick for any unused
+// stock color that lowers the weighted error, until no swap helps.
+function pickFromStock(n){
+  const lib = stock(); if (!lib.length) { alert('Your vinyl stock list has no checked colors.'); return null; }
+  const { pts, w } = samplePoints(8000), m = w.length, labs = lib.map(c => hexLab(c.hex));
+  const D = labs.map(L => { const d = new Float32Array(m); for (let i = 0; i < m; i++) { const a = pts[i*3]-L[0], b = pts[i*3+1]-L[1], e = pts[i*3+2]-L[2]; d[i] = LW*a*a+b*b+e*e; } return d; });
+  const best = new Float64Array(m).fill(Infinity), chosen = [];
+  for (let step = 0; step < Math.min(n, lib.length); step++) {
+    let pick = -1, pickTot = Infinity;
+    for (let c = 0; c < lib.length; c++) {
+      if (chosen.includes(c)) continue;
+      let tot = 0; for (let i = 0; i < m; i++) tot += (D[c][i] < best[i] ? D[c][i] : best[i]) * w[i];
+      if (tot < pickTot) { pickTot = tot; pick = c; }
+    }
+    chosen.push(pick);
+    for (let i = 0; i < m; i++) if (D[pick][i] < best[i]) best[i] = D[pick][i];
+  }
+  for (let pass = 0; pass < 6; pass++) {
+    let improved = false;
+    for (let s = 0; s < chosen.length; s++) {
+      // Distance to the nearest chosen color other than slot s.
+      const other = new Float32Array(m).fill(Infinity);
+      chosen.forEach((c, t) => { if (t === s) return; const d = D[c]; for (let i = 0; i < m; i++) if (d[i] < other[i]) other[i] = d[i]; });
+      const cost = c => { let t = 0; const d = D[c]; for (let i = 0; i < m; i++) t += (d[i] < other[i] ? d[i] : other[i]) * w[i]; return t; };
+      let bestC = chosen[s], bestT = cost(chosen[s]);
+      for (let c = 0; c < lib.length; c++) { if (chosen.includes(c)) continue; const t = cost(c); if (t < bestT * 0.9999) { bestT = t; bestC = c; } }
+      if (bestC !== chosen[s]) { chosen[s] = bestC; improved = true; }
+    }
+    if (!improved) break;
+  }
+  return chosen.map(c => ({ hex: lib[c].hex, name: lib[c].name, paper: false }));
+}
+function generate(){
+  if (!S.img) return;
+  const n = +$('#nColors').value;
+  let pal;
+  if (S.source === 'stock') { pal = pickFromStock(n); if (!pal) return; }
+  else pal = kmeans(samplePoints(20000), n).map(c => { const hex = labToHex(...c); return { hex, name: nearestStockName(hex), paper: false }; });
+  // Remove exact duplicates (pictures with fewer distinct colors than requested).
+  const seen = new Set(); S.palette = pal.filter(p => !seen.has(p.hex) && seen.add(p.hex));
+  S.paletteEdited = false;
+  assign(); sortByCount(); renderPalette(); refresh();
+}
+function nearestStockName(hex){
+  const lib = stock(); if (!lib.length) return 'Color';
+  const L = hexLab(hex); let best = null, bd = Infinity;
+  lib.forEach(c => { const M = hexLab(c.hex); const d = (M[0]-L[0])**2 + (M[1]-L[1])**2 + (M[2]-L[2])**2; if (d < bd) { bd = d; best = c; } });
+  return 'Custom (near ' + best.name + ')';
+}
+function sortByCount(){
+  const order = S.palette.map((p, i) => i).sort((a, b) => S.counts[b] - S.counts[a]);
+  const remap = new Uint16Array(order.length); order.forEach((old, nw) => remap[old] = nw);
+  S.palette = order.map(i => S.palette[i]); S.counts = order.map(i => S.counts[i]);
+  for (let i = 0; i < S.assign.length; i++) S.assign[i] = remap[S.assign[i]];
+}
+function snapAllToStock(){
+  const lib = stock(); if (!lib.length) { alert('Your vinyl stock list has no checked colors.'); return; }
+  const labs = lib.map(c => hexLab(c.hex)), used = new Set();
+  const order = S.palette.map((p, i) => i).sort((a, b) => (S.counts[b] || 0) - (S.counts[a] || 0));
+  order.forEach(i => {
+    const L = hexLab(S.palette[i].hex); let best = -1, bd = Infinity;
+    labs.forEach((M, c) => { if (used.has(c) && used.size < lib.length) return; const d = (M[0]-L[0])**2 + (M[1]-L[1])**2 + (M[2]-L[2])**2; if (d < bd) { bd = d; best = c; } });
+    used.add(best); S.palette[i].hex = lib[best].hex; S.palette[i].name = lib[best].name;
+  });
+  S.paletteEdited = true;
+  assign(); renderPalette(); refresh();
+}
+
+// ---------- Assign cells to palette ----------
+function assign(){
+  const n = S.cols * S.rows, P = S.palette.length, pal = S.palette.map(p => hexLab(p.hex));
+  const out = new Uint16Array(n), counts = new Array(P).fill(0);
+  const nearest = (L, a, b) => { let best = 0, bd = Infinity; for (let j = 0; j < P; j++) { const d = LW*(pal[j][0]-L)**2 + (pal[j][1]-a)**2 + (pal[j][2]-b)**2; if (d < bd) { bd = d; best = j; } } return best; };
+  const strength = Math.max(0, Math.min(1, num('#dither', 0) / 100)), W = S.cols, H = S.rows;
+  if (!strength) {
+    for (let i = 0; i < n; i++) out[i] = nearest(S.cellLab[i*3], S.cellLab[i*3+1], S.cellLab[i*3+2]);
+  } else {
+    // Floyd–Steinberg at adjustable strength, serpentine scan, error capped to avoid streaks.
+    const buf = Float32Array.from(S.cellLab), cap = 30;
+    const push = (x, y, e, f) => { if (x < 0 || x >= W || y >= H) return; const k = (y * W + x) * 3; buf[k] += e[0]*f; buf[k+1] += e[1]*f; buf[k+2] += e[2]*f; };
+    for (let y = 0; y < H; y++) {
+      const dir = y % 2 ? -1 : 1;
+      for (let xi = 0; xi < W; xi++) {
+        const x = dir > 0 ? xi : W - 1 - xi, i = y * W + x, k = i * 3, j = nearest(buf[k], buf[k+1], buf[k+2]);
+        out[i] = j;
+        const e = [0, 1, 2].map(c => Math.max(-cap, Math.min(cap, (buf[k + c] - pal[j][c]) * strength)));
+        push(x + dir, y, e, 7/16); push(x - dir, y + 1, e, 3/16); push(x, y + 1, e, 5/16); push(x + dir, y + 1, e, 1/16);
+      }
+    }
+  }
+  if ($('#despeckle').checked) despeckle(out, pal);
+  for (let i = 0; i < n; i++) counts[out[i]]++;
+  S.assign = out; S.counts = counts;
+}
+// Replace a lone square (no neighbor shares its color) with the most common neighbor
+// color, but only when that color is nearly as close to the picture there.
+function despeckle(out, pal){
+  const W = S.cols, H = S.rows, src = Uint16Array.from(out), lab = S.cellLab;
+  const dist = (k, j) => Math.sqrt(LW*(pal[j][0]-lab[k])**2 + (pal[j][1]-lab[k+1])**2 + (pal[j][2]-lab[k+2])**2);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x, own = src[i], tally = new Map(); let same = false;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue; const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+      const v = src[yy * W + xx]; if (v === own) { same = true; break; } tally.set(v, (tally.get(v) || 0) + 1);
+    }
+    if (same || !tally.size) continue;
+    let cand = -1, cn = 0; tally.forEach((c, v) => { if (c > cn) { cn = c; cand = v; } });
+    if (dist(i * 3, cand) - dist(i * 3, own) < 12) out[i] = cand;
+  }
+}
+// Average color difference (ΔE) between the original picture and the mosaic, both
+// slightly blurred to mimic viewing the wall from a few steps back.
+function likeness(){
+  const n = S.cols * S.rows, pal = S.palette.map(p => hexLab(p.hex)), mos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { const c = pal[S.assign[i]]; mos[i*3] = c[0]; mos[i*3+1] = c[1]; mos[i*3+2] = c[2]; }
+  const a = blurLab(S.cellLabRaw, S.cols, S.rows), b = blurLab(mos, S.cols, S.rows);
+  let t = 0; for (let i = 0; i < n; i++) t += Math.sqrt((a[i*3]-b[i*3])**2 + (a[i*3+1]-b[i*3+1])**2 + (a[i*3+2]-b[i*3+2])**2);
+  return t / n;
+}
+
+// ---------- Palette UI ----------
+function renderPalette(){
+  const el = $('#palette'); el.innerHTML = '';
+  const lib = stock();
+  S.palette.forEach((p, i) => {
+    const row = document.createElement('div'); row.className = 'pal-row' + (p.paper ? ' paper' : '');
+    const opts = lib.map((c, k) => `<option value="${k}" ${c.hex.toLowerCase() === p.hex.toLowerCase() && c.name === p.name ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+    row.innerHTML = `<span class="code">${code(i)}</span><input type="color" value="${p.hex}"><input type="text" value="${esc(p.name)}" aria-label="Color name"><span class="count"></span><button class="del" title="Remove this color">×</button>
+      <div class="sub"><select aria-label="Vinyl color"><option value="">Choose a vinyl color…</option>${opts}</select><label><input type="checkbox" ${p.paper ? 'checked' : ''}> No sticker</label></div>`;
+    const [, col, name, , del, sub] = row.children; const [sel, lab] = sub.children; const paper = lab.querySelector('input');
+    let t; col.oninput = () => { p.hex = col.value; S.paletteEdited = true; clearTimeout(t); t = setTimeout(() => { assign(); updateCounts(); refresh(); }, 120); };
+    name.onchange = () => { p.name = name.value; };
+    sel.onchange = () => { if (sel.value === '') return; const c = lib[+sel.value]; p.hex = c.hex; p.name = c.name; S.paletteEdited = true; assign(); renderPalette(); refresh(); };
+    paper.onchange = () => { p.paper = paper.checked; row.classList.toggle('paper', p.paper); refresh(); };
+    del.onclick = () => { if (S.palette.length < 2) return; S.palette.splice(i, 1); S.paletteEdited = true; assign(); renderPalette(); refresh(); };
+    el.appendChild(row);
+  });
+  updateCounts();
+}
+function updateCounts(){
+  const rows = $('#palette').children;
+  S.palette.forEach((p, i) => { if (rows[i]) rows[i].querySelector('.count').textContent = fmt(S.counts[i] || 0); });
+}
+
+// ---------- Plans: poster tiles & vinyl sheets ----------
+function tilePlan(){
+  const sq = num('#sq', 0.5), m = num('#pM', 0.5), pw = num('#pW', 24), pl = num('#pL', 36);
+  const maxC = Math.floor((pw - 2 * m) / sq + 1e-9), maxR = Math.floor((pl - 2 * m) / sq + 1e-9);
+  if (maxC < 1 || maxR < 1) return { error: 'The squares do not fit on the paper with those margins.' };
+  const nx = Math.ceil(S.cols / maxC), ny = Math.ceil(S.rows / maxR);
+  const cw = Math.ceil(S.cols / nx), rh = Math.ceil(S.rows / ny), tiles = [];
+  for (let ty = 0; ty < ny; ty++) for (let tx = 0; tx < nx; tx++) {
+    const c0 = tx * cw, r0 = ty * rh, c1 = Math.min(S.cols, c0 + cw), r1 = Math.min(S.rows, r0 + rh);
+    tiles.push({ tx, ty, c0, r0, cols: c1 - c0, rows: r1 - r0, w: (c1 - c0) * sq + 2 * m, h: (r1 - r0) * sq + 2 * m });
+  }
+  return { nx, ny, cw, rh, tiles, sq, m };
+}
+const tileName = (tx, ty) => `${ty + 1}-${tx + 1}`;
+
+function vinylPlan(){
+  const sq = num('#sq', 0.5), st = Math.max(0.05, num('#vS', sq)), mode = $('#vMode').value;
+  const gap = mode === 'grid' ? 0 : Math.max(0, num('#vGap', 0.125));
+  const vw = num('#vW', 12), vl = num('#vL', 24), m = Math.max(0, num('#vM', 0.25)), spare = Math.max(0, num('#vSpare', 5));
+  const pitch = st + gap;
+  const perRow = Math.floor((vw - 2 * m + gap) / pitch + 1e-9), rowsMax = Math.floor((vl - 2 * m + gap) / pitch + 1e-9);
+  if (perRow < 1 || rowsMax < 1) return { error: 'Stickers do not fit on the vinyl with those settings.' };
+  const perSheet = perRow * rowsMax, colors = [];
+  S.palette.forEach((p, i) => {
+    const n = S.counts[i] || 0; if (p.paper || !n) return;
+    const total = n + Math.ceil(n * spare / 100), sheets = Math.ceil(total / perSheet);
+    const lastRows = Math.ceil((total - (sheets - 1) * perSheet) / perRow);
+    const length = (sheets - 1) * vl + lastRows * pitch - gap + 2 * m;
+    colors.push({ i, p, n, total, sheets, length });
+  });
+  return { st, gap, pitch, vw, vl, m, perRow, rowsMax, perSheet, mode, colors };
+}
+
+// ---------- Buying vinyl ----------
+const CATALOG = ORACAL.map(([code, name, hex, matte]) => ({ code, name, hex, matte: !!matte, lab: hexLab(hex) }));
+const DEFAULT_STORES = [
+  ['Sign Warehouse', 'https://signwarehouse.com/search?q={q}'],
+  ['Amazon', 'https://www.amazon.com/s?k={q}'],
+  ['eBay', 'https://www.ebay.com/sch/i.html?_nkw={q}'],
+  ['Google Shopping', 'https://www.google.com/search?tbm=shop&q={q}']
+];
+function loadStores(){
+  try { const v = JSON.parse(localStorage.getItem(STORES_KEY)); if (Array.isArray(v) && v.length) return v; } catch (e) {}
+  return DEFAULT_STORES;
+}
+let STORES = loadStores();
+function recommendVinyl(hex){
+  const L = hexLab(hex); let best = null, bd = Infinity;
+  CATALOG.forEach(c => { if (/metallic/.test(c.name) && c.hex !== hex.toLowerCase()) return; const d = Math.sqrt((c.lab[0]-L[0])**2 + (c.lab[1]-L[1])**2 + (c.lab[2]-L[2])**2); if (d < bd) { bd = d; best = c; } });
+  return { c: best, dE: bd };
+}
+function matchLabel(dE){
+  if (dE < 2.5) return ['Exact match', 'm0'];
+  if (dE < 6) return ['Very close', 'm1'];
+  if (dE < 12) return ['Close: compare a swatch', 'm2'];
+  return ['No close ORACAL 651 color', 'm3'];
+}
+// Roll sizes: craft sellers sell 12″ × 10 ft; distributors sell 10-yd (30 ft) and 50-yd (150 ft).
+function rollSuggestion(needIn, w){
+  const ft = needIn / 12, wl = `${w}″`;
+  if (w === 12 && ft <= 10) return `1 × 12″ × 10 ft roll`;
+  const n10 = Math.ceil(ft / 30);
+  if (n10 <= 3) return `${n10} × ${wl} × 10 yd roll${n10 > 1 ? 's' : ''}` + (w === 12 && ft <= 30 ? ` (or ${Math.ceil(ft / 10)} × 12″ × 10 ft)` : '');
+  const n50 = Math.ceil(ft / 150);
+  return `${n50} × ${wl} × 50 yd roll${n50 > 1 ? 's' : ''}`;
+}
+function shoppingRows(){
+  const V = vinylPlan(); if (V.error) return { V, rows: [] };
+  return { V, rows: V.colors.map(c => {
+    const rec = recommendVinyl(c.p.hex), need = c.length * 1.1;
+    return { ...c, rec, need, roll: rollSuggestion(need, V.vw), query: `Oracal 651 ${rec.c.code} ${rec.c.name.replace(/ \(metallic\)/, '')} ${V.vw}" vinyl` };
+  }) };
+}
+function renderShop(){
+  const { V, rows } = shoppingRows(), el = $('#shopList');
+  if (V.error) { el.innerHTML = `<p class="warn">${V.error}</p>`; return; }
+  if (!rows.length) { el.innerHTML = '<p class="muted">No sticker colors yet.</p>'; return; }
+  el.innerHTML = rows.map(r => {
+    const [lab, cls] = matchLabel(r.rec.dE), same = r.rec.dE < 0.5;
+    const links = STORES.map(([n, u]) => `<a href="${esc(u.replace('{q}', encodeURIComponent(r.query)))}" target="_blank" rel="noopener">${esc(n)}</a>`).join('');
+    return `<div class="shop-row">
+      <span class="code">${code(r.i)}</span>
+      <span class="sw2" title="Top: your color · Bottom: recommended vinyl"><i style="background:${r.p.hex}"></i><i style="background:${r.rec.c.hex}"></i></span>
+      <div><b>ORACAL 651 · ${r.rec.c.code} ${esc(r.rec.c.name)}</b><span class="match ${cls}">${lab}</span>${r.rec.c.matte ? ' <span class="muted">· matte available</span>' : ''}
+        <div class="need">${fmt(r.total)} stickers · about ${fmtFt(r.need)} of ${fmtIn(V.vw)} vinyl incl. 10% for test cuts → buy <b>${r.roll}</b></div>
+        <div class="links">Search: ${links}${same ? '' : `<button data-use="${r.i}" title="Change this color to the recommended vinyl">Use this vinyl</button>`}</div>
+      </div></div>`;
+  }).join('');
+}
+function shoppingCSV(){
+  const { V, rows } = shoppingRows();
+  const q = v => `"${String(v).replace(/"/g, '""')}"`;
+  const out = ['Letter,Your color,Recommended vinyl,Vinyl hex,Match,Stickers to cut,Vinyl needed (ft),Roll width (in),Suggested purchase,Matte available'];
+  rows.forEach(r => out.push([code(r.i), q(r.p.name + ' ' + r.p.hex), q(`ORACAL 651 ${r.rec.c.code} ${r.rec.c.name}`), r.rec.c.hex, q(matchLabel(r.rec.dE)[0]), r.total, (r.need / 12).toFixed(1), V.vw, q(r.roll), r.rec.c.matte ? 'yes' : 'no'].join(',')));
+  return '\ufeff' + out.join('\n').replace(/″/g, ' in') + '\n';
+}
+function useRecommended(indices){
+  indices.forEach(i => { const r = recommendVinyl(S.palette[i].hex).c; S.palette[i].hex = r.hex; S.palette[i].name = `${r.code} ${r.name}`; });
+  S.paletteEdited = true; assign(); renderPalette(); refresh();
+}
+
+// ---------- Stats & time ----------
+function refresh(){
+  const has = !!S.img && S.palette.length;
+  ['#pdfBtn', '#guideBtn', '#zipBtn', '#pngBtn', '#shopCsvBtn', '#snapOracalBtn'].forEach(b => $(b).disabled = !has);
+  updateSizeInfo();
+  if (!has) { $('#stats').innerHTML = ''; render(); return; }
+  const sq = num('#sq', 0.5);
+  const stickers = S.palette.reduce((s, p, i) => s + (p.paper ? 0 : S.counts[i] || 0), 0);
+  const T = tilePlan(), V = vinylPlan();
+  const sheets = V.error ? 0 : V.colors.reduce((s, c) => s + c.sheets, 0);
+  const cut = V.error ? 0 : V.colors.reduce((s, c) => s + c.total, 0);
+  const placeH = stickers * num('#tPlace', 8) / 3600, weedH = cut * num('#tWeed', 1) / 3600;
+  const tileH = (T.error ? 0 : T.tiles.length) * num('#tTile', 10) / 60, total = placeH + weedH + tileH;
+  const people = Math.max(1, Math.round(num('#tPeople', 25)));
+  const stickerColors = S.palette.filter(p => !p.paper).length;
+  const dE = likeness(), score = Math.round(100 * Math.exp(-dE / 25));
+  $('#stats').innerHTML = `
+    <div class="stat big"><div class="k">Likeness to original</div><div class="v">${score}%</div><div class="s">avg. color difference ΔE ${dE.toFixed(1)} (lower is closer)</div></div>
+    <div class="stat big"><div class="k">Stickers to place</div><div class="v">${fmt(stickers)}</div><div class="s">${fmt(cut)} to cut incl. extras</div></div>
+    <div class="stat big"><div class="k">Total time, 1 person</div><div class="v">${fmtDur(total)}</div><div class="s">${(Math.round(total * 10) / 10).toLocaleString()} human-hours</div></div>
+    <div class="stat"><div class="k">Finished size</div><div class="v">${fmtIn(S.cols * sq)} × ${fmtIn(S.rows * sq)}</div><div class="s">${fmtFt(S.cols * sq)} × ${fmtFt(S.rows * sq)}</div></div>
+    <div class="stat"><div class="k">Grid</div><div class="v">${S.cols} × ${S.rows}</div><div class="s">${fmt(S.cols * S.rows)} squares of ${fmtIn(sq)}</div></div>
+    <div class="stat"><div class="k">Colors</div><div class="v">${stickerColors}</div><div class="s">${S.palette.length - stickerColors ? (S.palette.length - stickerColors) + ' left as paper' : 'vinyl colors'}</div></div>
+    <div class="stat"><div class="k">Poster tiles</div><div class="v">${T.error ? '—' : T.tiles.length}</div><div class="s">${T.error ? T.error : `${T.nx} across × ${T.ny} down`}</div></div>
+    <div class="stat"><div class="k">Vinyl sheets</div><div class="v">${V.error ? '—' : sheets}</div><div class="s">${V.error ? V.error : `${V.perSheet} stickers per full sheet`}</div></div>`;
+  $('#tileInfo').innerHTML = T.error ? `<span class="warn">${T.error}</span>` :
+    `${T.tiles.length} tile${T.tiles.length > 1 ? 's' : ''} (${T.nx} across × ${T.ny} down). Each tile is up to ${T.cw} × ${T.rh} squares, printed on ${fmtIn(T.tiles[0].w)} × ${fmtIn(T.tiles[0].h)} paper. Trim each tile on its outer grid line and butt the edges together.`;
+  $('#vinylInfo').innerHTML = V.error ? `<span class="warn">${V.error}</span>` :
+    `${V.perRow} × ${V.rowsMax} = ${V.perSheet} stickers per full sheet. Vinyl needed: ` +
+    V.colors.map(c => `<b>${code(c.i)}</b> ${fmtFt(c.length)}`).join(' · ') + ` (at ${fmtIn(V.vw)} wide).`;
+  renderShop();
+  $('#timeBox').innerHTML = `
+    Placing ${fmt(stickers)} stickers: <b>${fmtDur(placeH)}</b><br>
+    Weeding ${fmt(cut)} cut stickers: <b>${fmtDur(weedH)}</b><br>
+    Trimming &amp; mounting ${T.error ? 0 : T.tiles.length} tiles: <b>${fmtDur(tileH)}</b><br>
+    <div style="margin-top:6px">Total for one person: <b>${fmtDur(total)}</b> (${(Math.round(total * 10) / 10).toLocaleString()} human-hours)<br>
+    Shared by ${people} people: about <b>${fmtDur(total / people)}</b> each, or ${fmt(stickers / people)} stickers each.</div>`;
+  render();
+}
+function updateSizeInfo(){
+  const w = num('#wIn', 40), h = num('#hIn', 36), sq = num('#sq', 0.5);
+  const sizes = [0.25, 0.375, 0.5, 0.75, 1, 1.5, 2];
+  $('#sizeChips').innerHTML = sizes.map(s => {
+    const n = Math.max(1, Math.round(w / s)) * Math.max(1, Math.round(h / s));
+    const lab = { 0.25: '¼″', 0.375: '⅜″', 0.5: '½″', 0.75: '¾″', 1: '1″', 1.5: '1½″', 2: '2″' }[s];
+    return `<button class="chip ${Math.abs(s - sq) < 1e-6 ? 'on' : ''}" data-s="${s}">${lab} · ${fmt(n)}</button>`;
+  }).join('');
+  $('#gridInfo').textContent = S.img ? `${S.cols} columns × ${S.rows} rows. The size snaps to whole squares: ${fmtIn(S.cols * sq)} × ${fmtIn(S.rows * sq)}.` : '';
+}
+
+// ---------- Preview rendering ----------
+function drawMosaic(ctx, px, view){
+  const W = S.cols * px, H = S.rows * px;
+  if (view === 'original') {
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(S.img, S.crop.sx, S.crop.sy, S.crop.sw, S.crop.sh, 0, 0, W, H); return;
+  }
+  if (view === 'mosaic') {
+    const t = document.createElement('canvas'); t.width = S.cols; t.height = S.rows;
+    const tc = t.getContext('2d'), id = tc.createImageData(S.cols, S.rows), rgb = S.palette.map(p => hexToRgb(p.hex));
+    for (let i = 0; i < S.assign.length; i++) { const c = rgb[S.assign[i]]; id.data[i*4] = c[0]; id.data[i*4+1] = c[1]; id.data[i*4+2] = c[2]; id.data[i*4+3] = 255; }
+    tc.putImageData(id, 0, 0); ctx.imageSmoothingEnabled = false; ctx.drawImage(t, 0, 0, W, H);
+    if (px >= 6) gridLines(ctx, px, 'rgba(0,0,0,.14)');
+    return;
+  }
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  gridLines(ctx, px, px >= 4 ? '#9a9a9a' : '#d0d0d0');
+  if (px >= 9) {
+    ctx.fillStyle = '#555'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let y = 0; y < S.rows; y++) for (let x = 0; x < S.cols; x++) {
+      const j = S.assign[y * S.cols + x]; if (S.palette[j].paper) continue;
+      const s = code(j); ctx.font = `600 ${Math.round(px * (s.length > 1 ? 0.4 : 0.55))}px system-ui,sans-serif`;
+      ctx.fillText(s, x * px + px / 2, y * px + px / 2 + 0.5);
+    }
+  }
+}
+function gridLines(ctx, px, color){
+  ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.beginPath();
+  for (let x = 0; x <= S.cols; x++) { ctx.moveTo(x * px + .5, 0); ctx.lineTo(x * px + .5, S.rows * px); }
+  for (let y = 0; y <= S.rows; y++) { ctx.moveTo(0, y * px + .5); ctx.lineTo(S.cols * px, y * px + .5); }
+  ctx.stroke();
+}
+function drawTiles(ctx, px){
+  const T = tilePlan(); if (T.error) return;
+  ctx.strokeStyle = '#e0245e'; ctx.lineWidth = Math.max(2, px / 4); ctx.setLineDash([8, 5]);
+  T.tiles.forEach(t => ctx.strokeRect(t.c0 * px, t.r0 * px, t.cols * px, t.rows * px));
+  ctx.setLineDash([]);
+  const fs = Math.max(12, Math.min(48, T.cw * px / 6));
+  ctx.font = `700 ${fs}px system-ui,sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  T.tiles.forEach(t => {
+    const label = 'Tile ' + tileName(t.tx, t.ty), w = ctx.measureText(label).width;
+    ctx.fillStyle = 'rgba(224,36,94,.9)'; ctx.fillRect(t.c0 * px + 4, t.r0 * px + 4, w + 12, fs + 8);
+    ctx.fillStyle = '#fff'; ctx.fillText(label, t.c0 * px + 10, t.r0 * px + 8);
+  });
+}
+function render(){
+  const cv = $('#view');
+  $('#empty').style.display = S.img ? 'none' : 'grid';
+  if (!S.img || !S.assign) { cv.width = 1; cv.height = 1; cv.style.display = 'none'; return; }
+  cv.style.display = 'block';
+  const cmp = S.view === 'compare', span = cmp ? 2 : 1;
+  const maxPx = Math.max(1, Math.floor(Math.min(16000 / Math.max(S.cols * span, S.rows), Math.sqrt(6e7 / (S.cols * S.rows * span)))));
+  const px = Math.min(S.zoom, maxPx), gap = cmp ? Math.max(8, px * 2) : 0;
+  cv.width = S.cols * px * span + gap; cv.height = S.rows * px;
+  const ctx = cv.getContext('2d');
+  if (cmp) {
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--canvas'); ctx.fillRect(0, 0, cv.width, cv.height);
+    drawMosaic(ctx, px, 'original'); ctx.save(); ctx.translate(S.cols * px + gap, 0); drawMosaic(ctx, px, 'mosaic'); ctx.restore();
+    return;
+  }
+  drawMosaic(ctx, px, S.view);
+  if ($('#showTiles').checked) drawTiles(ctx, px);
+}
+function fitZoom(){
+  if (!S.cols) return;
+  const vp = $('#viewport'), w = vp.clientWidth - 26, h = vp.clientHeight - 26;
+  S.zoom = Math.max(1, Math.min(40, Math.floor(Math.min(w / (S.cols * (S.view === 'compare' ? 2.1 : 1)), h / S.rows))));
+  $('#zoom').value = S.zoom;
+}
+
+// ---------- Rebuild pipeline ----------
+function rebuild(regenerate){
+  if (!S.img) { refresh(); return; }
+  sampleCells();
+  if (regenerate || !S.palette.length) { generate(); fitZoom(); render(); return; }
+  assign(); updateCounts(); refresh();
+}
+
+// ---------- Poster tiles PDF ----------
+async function exportPosters(){
+  const T = tilePlan(); if (T.error) return alert(T.error);
+  busy(true, 'Building poster PDF…'); await nextFrame();
+  try {
+    const { jsPDF } = window.jspdf; let doc = null;
+    const shade = +$('#shade').value, title = $('#title').value.trim() || 'Mosaic', sq = T.sq, m = T.m;
+    T.tiles.forEach(t => {
+      const orient = t.w > t.h ? 'l' : 'p';
+      if (!doc) doc = new jsPDF({ unit: 'in', format: [t.w, t.h], orientation: orient, compress: true });
+      else doc.addPage([t.w, t.h], orient);
+      const gw = t.cols * sq, gh = t.rows * sq;
+      // Grid
+      doc.setDrawColor(150); doc.setLineWidth(0.008);
+      for (let c = 1; c < t.cols; c++) doc.line(m + c * sq, m, m + c * sq, m + gh);
+      for (let r = 1; r < t.rows; r++) doc.line(m, m + r * sq, m + gw, m + r * sq);
+      doc.setDrawColor(40); doc.setLineWidth(0.02); doc.rect(m, m, gw, gh);
+      // Letters
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(shade); let fsNow = 0;
+      for (let r = 0; r < t.rows; r++) for (let c = 0; c < t.cols; c++) {
+        const j = S.assign[(t.r0 + r) * S.cols + t.c0 + c]; if (S.palette[j].paper) continue;
+        const s = code(j), fs = sq * 72 * (s.length > 1 ? 0.36 : 0.5);
+        if (fs !== fsNow) { doc.setFontSize(fs); fsNow = fs; }
+        doc.text(s, m + c * sq + sq / 2, m + r * sq + sq / 2, { align: 'center', baseline: 'middle' });
+      }
+      // Crop marks at grid corners
+      doc.setDrawColor(0); doc.setLineWidth(0.01);
+      const mk = Math.min(0.3, m * 0.6);
+      [[m, m, -1, -1], [m + gw, m, 1, -1], [m, m + gh, -1, 1], [m + gw, m + gh, 1, 1]].forEach(([x, y, dx, dy]) => {
+        doc.line(x + dx * 0.05, y, x + dx * mk, y); doc.line(x, y + dy * 0.05, x, y + dy * mk);
+      });
+      // Labels
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(40); doc.setFontSize(Math.min(11, m * 22));
+      const lab = `${title}  ·  Tile ${tileName(t.tx, t.ty)} of ${T.ny} rows × ${T.nx} columns  ·  grid columns ${t.c0 + 1}–${t.c0 + t.cols}, rows ${t.r0 + 1}–${t.r0 + t.rows}`;
+      doc.text(lab, m + 0.12, m * 0.45, { baseline: 'middle' });
+      const nb = [];
+      if (t.tx > 0) nb.push('left: ' + tileName(t.tx - 1, t.ty));
+      if (t.tx < T.nx - 1) nb.push('right: ' + tileName(t.tx + 1, t.ty));
+      if (t.ty > 0) nb.push('above: ' + tileName(t.tx, t.ty - 1));
+      if (t.ty < T.ny - 1) nb.push('below: ' + tileName(t.tx, t.ty + 1));
+      doc.text(`Trim on the outer grid line.${nb.length ? '  Neighbors — ' + nb.join(', ') : ''}`, m + 0.12, m + gh + m * 0.55, { baseline: 'middle' });
+      // Mini map of tile layout
+      const cell = Math.min(0.14, (m * 0.7) / T.ny, 2 / T.nx);
+      if (cell >= 0.04) {
+        const mx = m + gw - T.nx * cell, my = (m - T.ny * cell) / 2;
+        doc.setLineWidth(0.005); doc.setDrawColor(80);
+        for (let y = 0; y < T.ny; y++) for (let x = 0; x < T.nx; x++) {
+          if (x === t.tx && y === t.ty) { doc.setFillColor(40); doc.rect(mx + x * cell, my + y * cell, cell, cell, 'FD'); }
+          else doc.rect(mx + x * cell, my + y * cell, cell, cell);
+        }
+      }
+    });
+    download(doc.output('blob'), `${slug(title)}-poster-tiles.pdf`);
+  } catch (e) { console.error(e); alert('Could not build the PDF: ' + e.message); }
+  busy(false);
+}
+
+// ---------- Guide PDF (map + color key) ----------
+async function exportGuide(){
+  busy(true, 'Building color key…'); await nextFrame();
+  try {
+    const { jsPDF } = window.jspdf, doc = new jsPDF({ unit: 'in', format: 'letter' });
+    const title = $('#title').value.trim() || 'Mosaic', sq = num('#sq', 0.5), T = tilePlan(), V = vinylPlan();
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.text(title, 0.75, 0.9);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor(70);
+    const stickers = S.palette.reduce((s, p, i) => s + (p.paper ? 0 : S.counts[i]), 0);
+    doc.text([
+      `Finished size: ${fmtIn(S.cols * sq)} × ${fmtIn(S.rows * sq)} (${fmtFt(S.cols * sq)} × ${fmtFt(S.rows * sq)})   ·   Grid: ${S.cols} × ${S.rows} squares of ${fmtIn(sq)}`,
+      `Stickers to place: ${fmt(stickers)}   ·   Colors: ${S.palette.filter(p => !p.paper).length}   ·   Poster tiles: ${T.error ? '—' : `${T.tiles.length} (${T.nx} across × ${T.ny} down)`}`
+    ].map(pdfSafe), 0.75, 1.25);
+    // Map image
+    const maxW = 7, maxH = 6.2, ratio = Math.min(maxW / S.cols, maxH / S.rows);
+    const iw = S.cols * ratio, ih = S.rows * ratio, px = Math.max(1, Math.floor(1800 / Math.max(S.cols, S.rows)));
+    const c = document.createElement('canvas'); c.width = S.cols * px; c.height = S.rows * px;
+    const ctx = c.getContext('2d'); drawMosaic(ctx, px, 'mosaic'); drawTiles(ctx, px);
+    doc.addImage(c.toDataURL('image/jpeg', 0.9), 'JPEG', 0.75 + (maxW - iw) / 2, 1.75, iw, ih);
+    doc.setTextColor(30); doc.setFontSize(10.5);
+    doc.text([
+      'How to assemble:',
+      '1. Print every tile from the poster PDF at 100% (actual size, no scaling).',
+      '2. Trim each tile on its outer grid line. Tile names are row-column: tile 1-2 is top row, second from left.',
+      '3. Butt the tiles together on the wall following this map, matching the grid lines.',
+      '4. Peel each vinyl square and stick it on the square with the same letter.'
+    ], 0.75, 1.75 + ih + 0.4);
+    // Color key
+    doc.addPage('letter', 'p');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(0); doc.text('Color key', 0.75, 0.9);
+    const cols = [0.75, 1.35, 1.9, 4.6, 5.45, 6.3, 7.0];
+    const head = ['Letter', 'Color', 'Vinyl', 'Stickers', 'To cut', 'Sheets', 'Length'];
+    doc.setFontSize(9.5); let y = 1.3;
+    head.forEach((h, k) => doc.text(h, cols[k], y)); y += 0.12; doc.setLineWidth(0.01); doc.line(0.75, y, 7.75, y); y += 0.1;
+    doc.setFont('helvetica', 'normal');
+    S.palette.forEach((p, i) => {
+      if (y > 10.3) { doc.addPage('letter', 'p'); y = 0.9; }
+      const v = V.error ? null : V.colors.find(c => c.i === i), rgb = hexToRgb(p.hex);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text(code(i), cols[0] + 0.1, y + 0.2);
+      doc.setFillColor(rgb[0], rgb[1], rgb[2]); doc.setDrawColor(120); doc.rect(cols[1], y, 0.4, 0.28, 'FD');
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+      doc.text(doc.splitTextToSize(p.name + (p.paper ? ' — no sticker (paper)' : '') + `  ${p.hex}`, 2.6), cols[2], y + 0.12);
+      doc.text(fmt(S.counts[i]), cols[3], y + 0.18);
+      doc.text(v ? fmt(v.total) : '—', cols[4], y + 0.18);
+      doc.text(v ? String(v.sheets) : '—', cols[5], y + 0.18);
+      doc.text(v ? pdfSafe(fmtFt(v.length)) : '—', cols[6], y + 0.18);
+      y += 0.4;
+    });
+    if (!V.error) { doc.setFontSize(9); doc.setTextColor(90); doc.text(pdfSafe(`Vinyl length assumes a ${fmtIn(V.vw)} roll, sheets up to ${fmtIn(V.vl)} long, and ${num('#vSpare', 5)}% extra stickers.`), 0.75, Math.min(y + 0.2, 10.6)); }
+    // Shopping list
+    const shop = shoppingRows();
+    if (shop.rows.length) {
+      doc.addPage('letter', 'p'); doc.setTextColor(0);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.text('Vinyl shopping list', 0.75, 0.9);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(70);
+      doc.text(pdfSafe(`Closest ORACAL 651 gloss color for each sticker color. Amounts include 10% for test cuts, at ${fmtIn(shop.V.vw)} roll width.`), 0.75, 1.15);
+      let yy = 1.55;
+      shop.rows.forEach(r => {
+        if (yy > 10.2) { doc.addPage('letter', 'p'); yy = 0.9; }
+        const a = hexToRgb(r.p.hex), b = hexToRgb(r.rec.c.hex);
+        doc.setTextColor(0); doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text(code(r.i), 0.85, yy + 0.2);
+        doc.setDrawColor(120); doc.setFillColor(a[0], a[1], a[2]); doc.rect(1.3, yy, 0.4, 0.16, 'FD'); doc.setFillColor(b[0], b[1], b[2]); doc.rect(1.3, yy + 0.18, 0.4, 0.16, 'FD');
+        doc.setFontSize(10.5); doc.text(`ORACAL 651  ${r.rec.c.code} ${r.rec.c.name}`, 1.9, yy + 0.12);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(70);
+        doc.text(pdfSafe(`${matchLabel(r.rec.dE)[0]}${r.rec.c.matte ? ' - matte available' : ''}  |  ${fmt(r.total)} stickers  |  about ${fmtFt(r.need)}  |  buy ${r.roll}`), 1.9, yy + 0.3);
+        yy += 0.5;
+      });
+      doc.setFontSize(9); doc.setTextColor(90);
+      doc.text(doc.splitTextToSize('Screen colors are approximate: check a printed ORACAL 651 color chart before ordering. For a school purchase order or bulk rolls, order through an authorized ORAFOL sign-supply distributor.', 7), 0.75, Math.min(yy + 0.2, 10.4));
+    }
+    download(doc.output('blob'), `${slug(title)}-color-key.pdf`);
+  } catch (e) { console.error(e); alert('Could not build the PDF: ' + e.message); }
+  busy(false);
+}
+
+// ---------- Vinyl cut files ----------
+function sheetGeometry(V, count){
+  const rows = Math.ceil(count / V.perRow), full = Math.floor(count / V.perRow), rem = count % V.perRow;
+  const W = V.vw, H = 2 * V.m + rows * V.pitch - V.gap, segs = [], rects = [];
+  if (V.mode === 'grid') {
+    const s = V.st, ox = V.m, oy = V.m;
+    const rowW = r => r < 0 || r >= rows ? 0 : (r < full ? V.perRow : rem);
+    for (let r = 0; r <= rows; r++) { const w = Math.max(rowW(r - 1), rowW(r)); if (w) segs.push([ox, oy + r * s, ox + w * s, oy + r * s]); }
+    for (let c = 0; c <= V.perRow; c++) { const n = full + (rem && c <= rem ? 1 : 0); if (n) segs.push([ox + c * s, oy, ox + c * s, oy + n * s]); }
+  } else {
+    for (let k = 0; k < count; k++) rects.push([V.m + (k % V.perRow) * V.pitch, V.m + Math.floor(k / V.perRow) * V.pitch, V.st]);
+  }
+  return { W, H, segs, rects };
+}
+function toSVG(g){
+  const p = v => (v * 72).toFixed(3);
+  let d = g.segs.map(([a, b, c, e]) => `M${p(a)} ${p(b)}L${p(c)} ${p(e)}`).join('');
+  d += g.rects.map(([x, y, s]) => `M${p(x)} ${p(y)}h${p(s)}v${p(s)}h${p(-s)}Z`).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${g.W}in" height="${g.H.toFixed(4)}in" viewBox="0 0 ${p(g.W)} ${p(g.H)}">\n<path d="${d}" fill="none" stroke="#ff0000" stroke-width="0.25"/>\n</svg>\n`;
+}
+function toEPS(g){
+  const p = v => (v * 72).toFixed(3), Hp = g.H * 72, fy = v => (Hp - v * 72).toFixed(3);
+  const out = ['%!PS-Adobe-3.0 EPSF-3.0', `%%BoundingBox: 0 0 ${Math.ceil(g.W * 72)} ${Math.ceil(Hp)}`, `%%HiResBoundingBox: 0 0 ${p(g.W)} ${Hp.toFixed(3)}`, '%%Creator: Sticker Mosaic Maker', '%%EndComments', '0.25 setlinewidth 1 0 0 setrgbcolor'];
+  g.segs.forEach(([a, b, c, e]) => out.push(`newpath ${p(a)} ${fy(b)} moveto ${p(c)} ${fy(e)} lineto stroke`));
+  g.rects.forEach(([x, y, s]) => out.push(`newpath ${p(x)} ${fy(y)} moveto ${p(s)} 0 rlineto 0 ${p(-s)} rlineto ${p(-s)} 0 rlineto closepath stroke`));
+  out.push('showpage', '%%EOF');
+  return out.join('\n') + '\n';
+}
+async function exportCutFiles(){
+  const V = vinylPlan(); if (V.error) return alert(V.error);
+  busy(true, 'Building cut files…'); await nextFrame();
+  try {
+    const zip = new JSZip(), title = $('#title').value.trim() || 'Mosaic';
+    const csv = ['Letter,Vinyl color,Hex,Stickers on poster,Stickers to cut,Sheets,Vinyl length (in)'];
+    V.colors.forEach(c => {
+      const base = `${code(c.i)}_${slug(c.p.name)}`;
+      for (let s = 0; s < c.sheets; s++) {
+        const count = Math.min(V.perSheet, c.total - s * V.perSheet), g = sheetGeometry(V, count);
+        const name = `${base}_sheet${s + 1}of${c.sheets}_${count}pcs`;
+        zip.file(`SVG/${name}.svg`, toSVG(g)); zip.file(`EPS/${name}.eps`, toEPS(g));
+      }
+      csv.push([code(c.i), `"${c.p.name.replace(/"/g, '""')}"`, c.p.hex, c.n, c.total, c.sheets, c.length.toFixed(1)].join(','));
+    });
+    zip.file('cut-list.csv', csv.join('\n') + '\n');
+    zip.file('shopping-list.csv', shoppingCSV());
+    zip.file('README.txt', [
+      `${title} — vinyl cut files`, '',
+      `Sticker size: ${V.st}" · Layout: ${V.mode === 'grid' ? 'shared grid lines' : 'separate squares, ' + V.gap + '" gap'}`,
+      `Vinyl roll width: ${V.vw}" · Max sheet length: ${V.vl}" · Edge margin: ${V.m}"`,
+      `Full sheet: ${V.perRow} x ${V.rowsMax} = ${V.perSheet} stickers`, '',
+      'Each file name starts with the color letter printed on the poster.',
+      'SVG and EPS folders contain the same cuts; import whichever your Roland software accepts.',
+      'Files are drawn at actual size in inches. Do not scale them on import.',
+      'Kiss-cut (through the vinyl, not the backing). With shared grid lines, weed only the border.', '',
+      'See cut-list.csv for counts and vinyl length per color.'
+    ].join('\n'));
+    download(await zip.generateAsync({ type: 'blob' }), `${slug(title)}-vinyl-cut-files.zip`);
+  } catch (e) { console.error(e); alert('Could not build the cut files: ' + e.message); }
+  busy(false);
+}
+
+// ---------- Sample picture ----------
+function sampleImage(){
+  const c = document.createElement('canvas'); c.width = 800; c.height = 720; const x = c.getContext('2d');
+  const sky = x.createLinearGradient(0, 0, 0, 500); sky.addColorStop(0, '#2b6cc4'); sky.addColorStop(1, '#a8d8f0');
+  x.fillStyle = sky; x.fillRect(0, 0, 800, 720);
+  x.fillStyle = '#ffd23f'; x.beginPath(); x.arc(560, 200, 95, 0, Math.PI * 2); x.fill();
+  x.fillStyle = '#ffffff'; [[180, 150, 60], [240, 140, 75], [300, 160, 55]].forEach(([a, b, r]) => { x.beginPath(); x.arc(a, b, r, 0, Math.PI * 2); x.fill(); });
+  x.fillStyle = '#3f8f3a'; x.beginPath(); x.moveTo(0, 520); x.quadraticCurveTo(250, 380, 520, 520); x.lineTo(0, 720); x.fill();
+  x.fillStyle = '#1f5f2a'; x.beginPath(); x.moveTo(250, 720); x.quadraticCurveTo(560, 400, 800, 480); x.lineTo(800, 720); x.fill();
+  x.fillStyle = '#e8483f'; for (let i = 0; i < 9; i++) { x.beginPath(); x.arc(60 + i * 85, 650 - (i % 3) * 30, 14, 0, Math.PI * 2); x.fill(); }
+  $('#title').value = 'Sunny Hills'; loadImage(c.toDataURL('image/png'));
+}
+
+// ---------- Wiring ----------
+const drop = $('#drop');
+drop.onclick = () => $('#file').click();
+$('#file').onchange = e => readFile(e.target.files[0]);
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); readFile(e.dataTransfer.files[0]); };
+document.addEventListener('paste', e => { const f = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/')); if (f) readFile(f); });
+$('#sampleBtn').onclick = sampleImage;
+
+let sizeTimer; const sizeChanged = () => { clearTimeout(sizeTimer); sizeTimer = setTimeout(() => rebuild(false), 200); };
+$('#wIn').oninput = () => { syncHeightFromWidth(); sizeChanged(); };
+$('#hIn').oninput = () => { syncWidthFromHeight(); sizeChanged(); };
+$('#lockAspect').onchange = () => { syncHeightFromWidth(); sizeChanged(); };
+$('#sq').oninput = sizeChanged;
+$('#sizeChips').onclick = e => { const b = e.target.closest('[data-s]'); if (!b) return; $('#sq').value = b.dataset.s; rebuild(false); fitZoom(); render(); };
+
+$('#srcSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.source = b.dataset.v; [...$('#srcSeg').children].forEach(x => x.classList.toggle('on', x === b)); generate(); };
+$('#nColors').oninput = () => $('#nOut').textContent = $('#nColors').value;
+$('#nColors').onchange = generate;
+$('#genBtn').onclick = generate;
+const tuneLabels = () => {
+  const f = +$('#focus').value; $('#focusOut').textContent = f < 34 ? 'big areas' : f > 66 ? 'small details' : 'balanced';
+  $('#sharpOut').textContent = $('#sharp').value + '%';
+  [['contrast'], ['satur']].forEach(([id]) => { const v = +$('#' + id).value; $('#' + id + 'Out').textContent = (v > 0 ? '+' : '') + v + '%'; });
+  $('#ditherOut').textContent = +$('#dither').value ? $('#dither').value + '%' : 'off';
+};
+let tuneTimer;
+const retune = repick => { tuneLabels(); if (!S.img) return; clearTimeout(tuneTimer); tuneTimer = setTimeout(() => {
+  if (repick) applyTuning();
+  if (repick && !S.paletteEdited) generate(); else { assign(); updateCounts(); refresh(); }
+}, 150); };
+['#focus', '#sharp', '#contrast', '#satur'].forEach(id => $(id).addEventListener('input', () => retune(true)));
+$('#dither').addEventListener('input', () => retune(false));
+$('#despeckle').onchange = () => retune(false);
+tuneLabels();
+$('#snapBtn').onclick = () => S.img && snapAllToStock();
+$('#addBtn').onclick = () => { if (!S.img) return; S.palette.push({ hex: '#808080', name: 'New color', paper: false }); S.paletteEdited = true; assign(); renderPalette(); refresh(); };
+
+$('#libAdd').onclick = () => { S.library.push({ name: 'New vinyl', hex: '#808080', on: true }); saveLibrary(); renderLibrary(); renderPalette(); };
+$('#libAll').onclick = () => { S.library.forEach(c => c.on = true); saveLibrary(); renderLibrary(); renderPalette(); };
+$('#libNone').onclick = () => { S.library.forEach(c => c.on = false); saveLibrary(); renderLibrary(); renderPalette(); };
+$('#libReset').onclick = () => { if (!confirm('Replace your vinyl stock list with the Oracal 651 starter list?')) return; S.library = oracalLibrary(); saveLibrary(); renderLibrary(); renderPalette(); };
+$('#libExport').onclick = () => { $('#libText').value = S.library.map(c => `${c.name}, ${c.hex}`).join('\n'); };
+$('#libImport').onclick = () => {
+  const list = $('#libText').value.split('\n').map(l => { const m = l.match(/^(.*?)[,\t]\s*(#?[0-9a-f]{6})\s*$/i); return m ? { name: m[1].trim() || 'Vinyl', hex: '#' + m[2].replace('#', '').toLowerCase(), on: true } : null; }).filter(Boolean);
+  if (!list.length) return alert('No lines matched “Name, #hex”.');
+  S.library = list; saveLibrary(); renderLibrary(); renderPalette();
+};
+
+['#pW', '#pL', '#pM', '#vW', '#vL', '#vS', '#vSpare', '#vMode', '#vGap', '#vM', '#tPlace', '#tWeed', '#tTile', '#tPeople'].forEach(id => $(id).addEventListener('input', refresh));
+$('#vMode').onchange = () => { $('#vGap').disabled = $('#vMode').value === 'grid'; refresh(); };
+$('#vGap').disabled = true;
+$('#showTiles').onchange = render;
+$('#viewSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.view = b.dataset.v; [...$('#viewSeg').children].forEach(x => x.classList.toggle('on', x === b)); if (S.view === 'poster' && S.zoom < 12) { S.zoom = 16; $('#zoom').value = 16; } else if (S.view !== 'poster') fitZoom(); render(); };
+$('#zoom').oninput = () => { S.zoom = +$('#zoom').value; render(); };
+$('#fitBtn').onclick = () => { fitZoom(); render(); };
+$('#pngBtn').onclick = () => $('#view').toBlob(b => download(b, `${slug($('#title').value)}-${S.view}.png`));
+$('#pdfBtn').onclick = exportPosters;
+$('#guideBtn').onclick = exportGuide;
+$('#zipBtn').onclick = exportCutFiles;
+$('#shopCsvBtn').onclick = () => download(new Blob([shoppingCSV()], { type: 'text/csv' }), `${slug($('#title').value)}-vinyl-shopping-list.csv`);
+$('#snapOracalBtn').onclick = () => useRecommended(S.palette.map((p, i) => i).filter(i => !S.palette[i].paper));
+$('#shopList').onclick = e => { const b = e.target.closest('[data-use]'); if (b) useRecommended([+b.dataset.use]); };
+const showStores = () => { $('#storesText').value = STORES.map(([n, u]) => `${n} | ${u}`).join('\n'); };
+$('#storesSave').onclick = () => {
+  const list = $('#storesText').value.split('\n').map(l => l.split('|').map(x => x.trim())).filter(([n, u]) => n && /^https?:\/\/.*\{q\}/.test(u || ''));
+  if (!list.length) return alert('Each line needs a name, then |, then an address containing {q}.');
+  STORES = list; try { localStorage.setItem(STORES_KEY, JSON.stringify(list)); } catch (e) {} showStores(); renderShop();
+};
+$('#storesReset').onclick = () => { STORES = DEFAULT_STORES; try { localStorage.removeItem(STORES_KEY); } catch (e) {} showStores(); renderShop(); };
+showStores();
+
+renderLibrary(); refresh();
+</script>
+</body>
+</html>
